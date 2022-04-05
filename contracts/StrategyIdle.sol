@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import "../interfaces/idle/IIdleTokenV4.sol";
-import "../interfaces/idle/IdleReservoir.sol";
 import "../interfaces/idle/IMultiRewards.sol";
 import "../interfaces/yswaps/ITradeFactory.sol";
 import "../interfaces/uniswap/IUniswapRouter.sol";
@@ -32,8 +31,6 @@ contract StrategyIdle is BaseStrategyInitializable {
 
     address public tradeFactory;
 
-    address public idleReservoir;
-
     address public idleYieldToken;
 
     address public multiRewards;
@@ -45,13 +42,12 @@ contract StrategyIdle is BaseStrategyInitializable {
     constructor(
         address _vault,
         IERC20[] memory _rewardTokens,
-        address _idleReservoir,
         address _idleYieldToken,
         address _multiRewards,
         address _router,
         address _healthCheck
     ) public BaseStrategyInitializable(_vault) {
-        _init(_rewardTokens, _idleReservoir, _idleYieldToken, _multiRewards, _router, _healthCheck);
+        _init(_rewardTokens, _idleYieldToken, _multiRewards, _router, _healthCheck);
     }
 
     // ************************* Init methods *************************
@@ -60,7 +56,6 @@ contract StrategyIdle is BaseStrategyInitializable {
         address _vault,
         address _onBehalfOf,
         IERC20[] memory _rewardTokens,
-        address _idleReservoir,
         address _idleYieldToken,
         address _multiRewards,
         address _router,
@@ -68,12 +63,11 @@ contract StrategyIdle is BaseStrategyInitializable {
     ) external {
         super._initialize(_vault, _onBehalfOf, _onBehalfOf, _onBehalfOf);
 
-        _init(_rewardTokens, _idleReservoir, _idleYieldToken, _multiRewards, _router, _healthCheck);
+        _init(_rewardTokens, _idleYieldToken, _multiRewards, _router, _healthCheck);
     }
 
     function _init(
         IERC20[] memory _rewardTokens,
-        address _idleReservoir,
         address _idleYieldToken,
         address _multiRewards,
         address _router,
@@ -83,7 +77,6 @@ contract StrategyIdle is BaseStrategyInitializable {
 
         // can be empaty array
         rewardTokens = _rewardTokens; // set `tradeFactory` address after deployment.
-        idleReservoir = _idleReservoir;
         idleYieldToken = _idleYieldToken;
         // can be zero address.
         multiRewards = _multiRewards; // set `enabledStake` to true to enable stakeing after deployment.
@@ -215,7 +208,7 @@ contract StrategyIdle is BaseStrategyInitializable {
 
     // ************************* View methods *************************
 
-    /// @notice return staked idleTokens + balance that this contract holds
+    /// @notice return staked idleTokens + idleToken balance that this contract holds
     function totalIdleTokens() public view returns (uint256) {
         IMultiRewards _multiRewards = IMultiRewards(multiRewards);
         uint256 stakedBal;
@@ -321,9 +314,6 @@ contract StrategyIdle is BaseStrategyInitializable {
         )
     {
         IERC20 _want = want;
-
-        // Assure IdleController has IDLE tokens during redeem
-        IdleReservoir(idleReservoir).drip();
 
         if (enabledStake) {
             _claimRewards();
