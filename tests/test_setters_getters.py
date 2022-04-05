@@ -22,8 +22,8 @@ def test_double_init(strategy, strategist):
     with brownie.reverts("Strategy already initialized"):
         strategy.init(
             strategist,
-            [],
             strategist,
+            [],
             strategist,
             strategist,
             strategist,
