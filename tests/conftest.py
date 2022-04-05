@@ -1,5 +1,5 @@
 import pytest
-from brownie import config, Contract
+from brownie import config, Contract, interface
 from util import clone
 
 
@@ -60,14 +60,14 @@ STRATEGY_CONFIGS = {
         "token_address": "0x03ab458634910AaD20eF5f1C8ee96F1D6ac54919",
         "amount": 10_000 * 1e18,
     },
-    # "TUSD": {
-    #     "idleToken": {
-    #         "address": "0xc278041fDD8249FE4c1Aad1193876857EEa3D68c"
-    #     },
-    #     "whale": "0xf977814e90da44bfa03b6295a0616a897441acec",  # binance
-    #     "token_address": "0x0000000000085d4780B73119b644AE5ecd22b376",
-    #     "amount": 10_000 * 1e18,
-    # }
+    "TUSD": {
+        "idleToken": {
+            "address": "0xc278041fDD8249FE4c1Aad1193876857EEa3D68c"
+        },
+        "whale": "0xf977814e90da44bfa03b6295a0616a897441acec",  # binance
+        "token_address": "0x0000000000085d4780B73119b644AE5ecd22b376",
+        "amount": 10_000 * 1e18,
+    }
 }
 
 
@@ -153,7 +153,7 @@ def ymechs_safe():
 @ pytest.fixture
 def token(strategy_config):
     # this should be the address of the ERC-20 used by the strategy/vault (DAI)
-    yield Contract(strategy_config["token_address"])
+    yield interface.ERC20(strategy_config["token_address"])
 
 
 @ pytest.fixture
@@ -168,17 +168,17 @@ def idleToken(strategy_config):
 
 @ pytest.fixture
 def comp():
-    yield Contract("0xc00e94Cb662C3520282E6f5717214004A7f26888")
+    yield interface.ERC20("0xc00e94Cb662C3520282E6f5717214004A7f26888")
 
 
 @ pytest.fixture
 def idle():
-    yield Contract("0x875773784Af8135eA0ef43b5a374AaD105c5D39e")
+    yield interface.ERC20("0x875773784Af8135eA0ef43b5a374AaD105c5D39e")
 
 
 @ pytest.fixture
 def weth():
-    yield Contract("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
+    yield interface.ERC20("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
 
 # ***** Router *****
 
