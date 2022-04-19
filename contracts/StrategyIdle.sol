@@ -137,12 +137,12 @@ contract StrategyIdle is BaseStrategyInitializable {
 
         if (_multiRewards != address(0)) {
             // approve
-            uint256 trancheBal = _balance(_idleYieldToken);
+            uint256 idleTokenBal = _balance(_idleYieldToken);
             _idleYieldToken.approve(_multiRewards, type(uint256).max); // approve
 
             // stake
-            if (enabledStake && trancheBal != 0) {
-                IMultiRewards(_multiRewards).stake(trancheBal);
+            if (enabledStake && idleTokenBal != 0) {
+                IMultiRewards(_multiRewards).stake(idleTokenBal);
             }
         }
     }
@@ -463,7 +463,7 @@ contract StrategyIdle is BaseStrategyInitializable {
         if (enabledStake) {
             uint256 idleTokenBal = _balance(_idleYieldToken);
 
-            // if tranche to withdraw > current balance, withdraw
+            // if idleToken to withdraw > current balance, withdraw
             if (_tokensToWithdraw > idleTokenBal) {
                 IMultiRewards _multiRewards = IMultiRewards(multiRewards);
                 uint256 stakedBal = _multiRewards.balanceOf(address(this));
