@@ -119,7 +119,7 @@ contract StrategyIdle is BaseStrategyInitializable {
 
     /// @notice set multirewards contract
     /// @dev revoke or approve multirewards contract and directly unstake or stake tokens
-    function setMultiRewards(address _multiRewards) external onlyVaultManagers {
+    function setMultiRewards(address _multiRewards) external onlyGovernance {
         IIdleTokenV4 _idleYieldToken = IIdleTokenV4(idleYieldToken); // caching
 
         IMultiRewards _oldMultiRewards = IMultiRewards(multiRewards); // read old multirewards
@@ -315,10 +315,6 @@ contract StrategyIdle is BaseStrategyInitializable {
     {
         IERC20 _want = want;
 
-        if (enabledStake) {
-            _claimRewards();
-        }
-
         // Get debt, currentValue (want+idle), only want
         uint256 debt = vault.strategies(address(this)).totalDebt;
         uint256 currentValue = estimatedTotalAssets();
@@ -366,6 +362,10 @@ contract StrategyIdle is BaseStrategyInitializable {
     function adjustPosition(uint256 _debtOutstanding) internal override {
         // NOTE: Try to adjust positions so that `_debtOutstanding` can be freed up on *next* harvest (not immediately)
 
+        if (enabledStake) {
+            _claimRewards();
+        }
+
         uint256 wantBal = _balance(want);
         if (wantBal > _debtOutstanding) {
             _invest(wantBal - _debtOutstanding); // no underflow
@@ -411,8 +411,8 @@ contract StrategyIdle is BaseStrategyInitializable {
         IIdleTokenV4 _idleYieldToken = IIdleTokenV4(idleYieldToken);
         IMultiRewards _multiRewards = IMultiRewards(multiRewards);
 
-        // withdrawing amount 0 will cause to revert
-        if (enabledStake && _multiRewards.balanceOf(address(this)) != 0) {
+        // withdrawing amount 0 will cause to revert regardless of `enabledStake` flag
+        if (_multiRewards.balanceOf(address(this)) != 0) {
             _multiRewards.exit();
         }
 
@@ -430,6 +430,20 @@ contract StrategyIdle is BaseStrategyInitializable {
     function liquidateAllPositions() internal override returns (uint256 amountFreed) {
         _divest(totalIdleTokens());
         amountFreed = _balance(want);
+    }
+
+    // ************************* Invest/Divest External methods *************************
+
+    function invest(uint256 _wantAmount) external onlyVaultManagers {
+        _invest(_wantAmount);
+    }
+
+    function _divest(uint256 _tokensToWithdraw) external onlyVaultManagers {
+        _dinvest(_tokensToWithdraw);
+    }
+
+    function claimRewards() external onlyVaultManagers {
+        _claimRewards();
     }
 
     // ************************* Mutative Helper methods *************************
