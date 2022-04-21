@@ -30,8 +30,38 @@ brownie networks add Ethereum alchemy-mainnet  chainId=1 host=https://eth-mainne
 To set up mainnet forking :
 
 ```bash
-brownie networks add development alchemy-mainnet-forking cmd=ganache-cli fork=alchemy-mainnet mnemonic=brownie port=8545 accounts=10 host=http://127.0.0.1 timeout=120
+brownie networks add development alchemy-mainnet-fork cmd=ganache-cli fork=alchemy-mainnet mnemonic=brownie port=8545 accounts=10 host=http://127.0.0.1 timeout=120
 ```
 
 For specific options and more information about each command, type:
 `brownie networks --help`
+
+## Testing
+
+To run testing on forking mainnet type:
+
+```bash
+brownie test --network alchemy-mainnet-fork
+```
+
+use `--interactive` option to launch interactive console when a test fails.
+
+### Debugging
+
+type:
+
+```bash
+tx.traceback()
+```
+
+To see the call trace type:
+
+```bash
+tx.call_trace()
+```
+
+To see the emitted events type:
+
+```bash
+tx.info()
+```
