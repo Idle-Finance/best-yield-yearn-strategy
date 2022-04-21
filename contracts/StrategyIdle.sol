@@ -313,42 +313,28 @@ contract StrategyIdle is BaseStrategyInitializable {
             uint256 _debtPayment
         )
     {
-        IERC20 _want = want;
+        // Get total debt, total assets (want+idle)
+        uint256 totalDebt = vault.strategies(address(this)).totalDebt;
+        uint256 totalAssets = estimatedTotalAssets();
 
-        // Get debt, currentValue (want+idle), only want
-        uint256 debt = vault.strategies(address(this)).totalDebt;
-        uint256 currentValue = estimatedTotalAssets();
-
-        // Calculate total profit w/o farming
-        if (debt < currentValue) {
-            _profit = currentValue - debt; // no underflow
-        } else {
-            _loss = debt - currentValue; // no underflow
-        }
+        _profit = totalAssets > totalDebt ? totalAssets - totalDebt : 0; // no underflow
 
         // To withdraw = profit from lending + _debtOutstanding
         uint256 toFree = _debtOutstanding.add(_profit);
 
+        uint256 freed;
         // In the case want is not enough, divest from idle
-        (, uint256 withdrawalLoss) = liquidatePosition(toFree);
+        (freed, _loss) = liquidatePosition(toFree);
 
-        uint256 wantBalance = _balance(_want);
+        _debtPayment = _debtOutstanding >= freed ? freed : _debtOutstanding; // min
 
-        // Recalculate profit
-        if (withdrawalLoss < _profit) {
-            _profit = _profit - withdrawalLoss; // no underflow
+        // net out PnL
+        if (_profit > _loss) {
+            _profit = _profit - _loss; // no underflow
+            _loss = 0;
         } else {
-            _loss = _loss.add(withdrawalLoss.sub(_profit));
+            _loss = _loss - _profit; // no underflow
             _profit = 0;
-        }
-
-        if (wantBalance < _profit) {
-            _profit = wantBalance;
-            _debtPayment = 0;
-        } else if (wantBalance < _debtOutstanding.add(_profit)) {
-            _debtPayment = wantBalance.sub(_profit);
-        } else {
-            _debtPayment = _debtOutstanding;
         }
     }
 
@@ -432,14 +418,14 @@ contract StrategyIdle is BaseStrategyInitializable {
         amountFreed = _balance(want);
     }
 
-    // ************************* Invest/Divest External methods *************************
+    // ************************* External Invest/Divest methods *************************
 
     function invest(uint256 _wantAmount) external onlyVaultManagers {
         _invest(_wantAmount);
     }
 
-    function _divest(uint256 _tokensToWithdraw) external onlyVaultManagers {
-        _dinvest(_tokensToWithdraw);
+    function divest(uint256 _tokensToWithdraw) external onlyVaultManagers {
+        _divest(_tokensToWithdraw);
     }
 
     function claimRewards() external onlyVaultManagers {
