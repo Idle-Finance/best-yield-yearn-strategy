@@ -39,19 +39,30 @@ contract StrategyIdle is BaseStrategyInitializable {
 
     IERC20[] internal rewardTokens;
 
+    /**
+     * @notice
+     *  Initializes the Strategy or defer initialization when using a proxy
+     * @dev `_initialize` choose to init at deploy or later (proxy)
+     */
     constructor(
         address _vault,
         IERC20[] memory _rewardTokens,
         address _idleYieldToken,
         address _multiRewards,
         address _router,
-        address _healthCheck
+        address _healthCheck,
+        bool _initialize
     ) public BaseStrategyInitializable(_vault) {
-        _init(_rewardTokens, _idleYieldToken, _multiRewards, _router, _healthCheck);
+        if (_initialize) {
+            _init(_rewardTokens, _idleYieldToken, _multiRewards, _router, _healthCheck);
+        }
     }
 
     // ************************* Init methods *************************
 
+    /**
+     * @notice Initializes the Strategy when using a proxy
+     */
     function init(
         address _vault,
         address _onBehalfOf,
@@ -61,6 +72,7 @@ contract StrategyIdle is BaseStrategyInitializable {
         address _router,
         address _healthCheck
     ) external {
+        // address _vault, address _strategist, address _rewards ,address _keeper
         super._initialize(_vault, _onBehalfOf, _onBehalfOf, _onBehalfOf);
 
         _init(_rewardTokens, _idleYieldToken, _multiRewards, _router, _healthCheck);
