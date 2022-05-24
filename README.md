@@ -65,3 +65,17 @@ To see the emitted events type:
 ```bash
 tx.info()
 ```
+
+## Deployed Contracts
+
+Minimal proxy is used for developments
+
+| name                     | address                                    |
+| ------------------------ | ------------------------------------------ |
+| IdleDAI strategy (Logic) | 0x968B072BefFCd1A654D523290DcFE9b6F8139a4F |
+
+### ape tax
+
+| name             | address                                    |
+| ---------------- | ------------------------------------------ |
+| IdleDAI strategy | 0x70c17FF2A05ddC9C5bC36dB02C4ABF8B3e9f96D0 |
