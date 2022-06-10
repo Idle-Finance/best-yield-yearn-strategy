@@ -2,20 +2,6 @@ from brownie import ZERO_ADDRESS
 import brownie
 
 
-def test_enable_disable_staking(
-    chain, token, vault, strategy, user, management, trade_factory
-):
-    strategy.enableStaking({"from": management})
-    assert strategy.enabledStake() is True
-
-    strategy.disableStaking({"from": management})
-    assert strategy.enabledStake() is False
-
-    with brownie.reverts():
-        strategy.enableStaking({"from": user})
-    assert strategy.enabledStake() is False
-
-
 def test_update_reward_tokens(
     chain, token, vault, strategy, user, management, trade_factory
 ):

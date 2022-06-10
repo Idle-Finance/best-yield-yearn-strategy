@@ -9,7 +9,6 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import "../interfaces/idle/IIdleTokenV4.sol";
-import "../interfaces/idle/IMultiRewards.sol";
 import "../interfaces/yswaps/ITradeFactory.sol";
 import "../interfaces/uniswap/IUniswapRouter.sol";
 
@@ -33,28 +32,24 @@ contract StrategyIdle is BaseStrategyInitializable {
 
     address public idleYieldToken;
 
-    address public multiRewards;
-
-    bool public enabledStake;
-
     IERC20[] internal rewardTokens;
 
     /**
      * @notice
      *  Initializes the Strategy or defer initialization when using a proxy
      * @dev `_initialize` choose to init at deploy or later (proxy)
+     *      Set false to prevent initialization
      */
     constructor(
         address _vault,
         IERC20[] memory _rewardTokens,
         address _idleYieldToken,
-        address _multiRewards,
         address _router,
         address _healthCheck,
         bool _initialize
     ) public BaseStrategyInitializable(_vault) {
         if (_initialize) {
-            _init(_rewardTokens, _idleYieldToken, _multiRewards, _router, _healthCheck);
+            _init(_rewardTokens, _idleYieldToken, _router, _healthCheck);
         }
     }
 
@@ -68,20 +63,18 @@ contract StrategyIdle is BaseStrategyInitializable {
         address _onBehalfOf,
         IERC20[] memory _rewardTokens,
         address _idleYieldToken,
-        address _multiRewards,
         address _router,
         address _healthCheck
     ) external {
         // address _vault, address _strategist, address _rewards ,address _keeper
         super._initialize(_vault, _onBehalfOf, _onBehalfOf, _onBehalfOf);
 
-        _init(_rewardTokens, _idleYieldToken, _multiRewards, _router, _healthCheck);
+        _init(_rewardTokens, _idleYieldToken, _router, _healthCheck);
     }
 
     function _init(
         IERC20[] memory _rewardTokens,
         address _idleYieldToken,
-        address _multiRewards,
         address _router,
         address _healthCheck
     ) internal {
@@ -90,8 +83,6 @@ contract StrategyIdle is BaseStrategyInitializable {
         // can be empaty array
         rewardTokens = _rewardTokens; // set `tradeFactory` address after deployment.
         idleYieldToken = _idleYieldToken;
-        // can be zero address.
-        multiRewards = _multiRewards; // set `enabledStake` to true to enable stakeing after deployment.
         router = _router;
         healthCheck = _healthCheck;
 
@@ -99,65 +90,10 @@ contract StrategyIdle is BaseStrategyInitializable {
         // `EXP_SCALE` is fixed
         require(IIdleTokenV4(_idleYieldToken).decimals() == 18, "strat/decimals-18");
 
-        if (_multiRewards != address(0)) {
-            IIdleTokenV4(_idleYieldToken).approve(_multiRewards, type(uint256).max);
-        }
-
         want.safeApprove(_idleYieldToken, type(uint256).max);
     }
 
     // ************************* Permissioned methods *************************
-
-    /// @notice enable staking
-    /// @dev multiRewards and tradeFactory must be set in advance
-    function enableStaking() external onlyVaultManagers {
-        require(tradeFactory != address(0), "strat/tf-zero"); // first set tradeFactory
-        require(multiRewards != address(0), "strat/multirewards-zero"); // first set multiRewards
-        enabledStake = true;
-    }
-
-    /// @notice withdraw staked and disable staking
-    /// @dev to revoke multirewards contract use `setMultiRewards` method
-    ///      if `enabledStake` is false, staked amount must be zero
-    function disableStaking() external onlyVaultManagers {
-        enabledStake = false;
-        IMultiRewards _multiRewards = IMultiRewards(multiRewards);
-        // exit
-        // NOTE: withdrawing amount 0 will cause to revert
-        if (address(_multiRewards) != address(0) && _multiRewards.balanceOf(address(this)) != 0) {
-            _multiRewards.exit();
-        }
-    }
-
-    /// @notice set multirewards contract
-    /// @dev revoke or approve multirewards contract and directly unstake or stake tokens
-    function setMultiRewards(address _multiRewards) external onlyGovernance {
-        IIdleTokenV4 _idleYieldToken = IIdleTokenV4(idleYieldToken); // caching
-
-        IMultiRewards _oldMultiRewards = IMultiRewards(multiRewards); // read old multirewards
-        multiRewards = _multiRewards; // set new multirewards
-
-        if (address(_oldMultiRewards) != address(0)) {
-            // exit
-            // NOTE: withdrawing amount 0 will cause to revert
-            if (_oldMultiRewards.balanceOf(address(this)) != 0) {
-                _oldMultiRewards.exit();
-            }
-            // revoke
-            _idleYieldToken.approve(address(_oldMultiRewards), 0);
-        }
-
-        if (_multiRewards != address(0)) {
-            // approve
-            uint256 idleTokenBal = _balance(_idleYieldToken);
-            _idleYieldToken.approve(_multiRewards, type(uint256).max); // approve
-
-            // stake
-            if (enabledStake && idleTokenBal != 0) {
-                IMultiRewards(_multiRewards).stake(idleTokenBal);
-            }
-        }
-    }
 
     /// @notice set reward tokens
     function setRewardTokens(IERC20[] memory _rewardTokens) external onlyVaultManagers {
@@ -222,15 +158,7 @@ contract StrategyIdle is BaseStrategyInitializable {
 
     /// @notice return staked idleTokens + idleToken balance that this contract holds
     function totalIdleTokens() public view returns (uint256) {
-        IMultiRewards _multiRewards = IMultiRewards(multiRewards);
-        uint256 stakedBal;
-
-        // multiRewards == address(0) must be equivalent to enabledStaked being set to `false`
-        if (address(_multiRewards) != address(0)) {
-            stakedBal = _multiRewards.balanceOf(address(this));
-        }
-
-        return stakedBal.add(_balance(IERC20(idleYieldToken)));
+        return _balance(IERC20(idleYieldToken));
     }
 
     function getRewardTokens() external view returns (IERC20[] memory) {
@@ -360,10 +288,6 @@ contract StrategyIdle is BaseStrategyInitializable {
     function adjustPosition(uint256 _debtOutstanding) internal override {
         // NOTE: Try to adjust positions so that `_debtOutstanding` can be freed up on *next* harvest (not immediately)
 
-        if (enabledStake) {
-            _claimRewards();
-        }
-
         uint256 wantBal = _balance(want);
         if (wantBal > _debtOutstanding) {
             _invest(wantBal - _debtOutstanding); // no underflow
@@ -407,12 +331,6 @@ contract StrategyIdle is BaseStrategyInitializable {
         // NOTE: `migrate` will automatically forward all `want` in this strategy to the new one
 
         IIdleTokenV4 _idleYieldToken = IIdleTokenV4(idleYieldToken);
-        IMultiRewards _multiRewards = IMultiRewards(multiRewards);
-
-        // withdrawing amount 0 will cause to revert regardless of `enabledStake` flag
-        if (_multiRewards.balanceOf(address(this)) != 0) {
-            _multiRewards.exit();
-        }
 
         uint256 idleTokenBal = _balance(_idleYieldToken);
         if (idleTokenBal != 0) {
@@ -440,10 +358,6 @@ contract StrategyIdle is BaseStrategyInitializable {
         _divest(_tokensToWithdraw);
     }
 
-    function claimRewards() external onlyVaultManagers {
-        _claimRewards();
-    }
-
     // ************************* Mutative Helper methods *************************
 
     /// @notice deposit `want` to Idle
@@ -460,10 +374,6 @@ contract StrategyIdle is BaseStrategyInitializable {
         _idleToken.mintIdleToken(_wantAmount, true, REFERRAL);
 
         tokensMinted = _balance(_idleToken).sub(before);
-
-        if (enabledStake && tokensMinted != 0) {
-            IMultiRewards(multiRewards).stake(tokensMinted);
-        }
     }
 
     /// @notice withdraw `want` to Idle
@@ -471,24 +381,6 @@ contract StrategyIdle is BaseStrategyInitializable {
     function _divest(uint256 _tokensToWithdraw) internal returns (uint256 wantRedeemed) {
         IERC20 _want = want;
         IIdleTokenV4 _idleYieldToken = IIdleTokenV4(idleYieldToken);
-
-        if (enabledStake) {
-            uint256 idleTokenBal = _balance(_idleYieldToken);
-
-            // if idleToken to withdraw > current balance, withdraw
-            if (_tokensToWithdraw > idleTokenBal) {
-                IMultiRewards _multiRewards = IMultiRewards(multiRewards);
-                uint256 stakedBal = _multiRewards.balanceOf(address(this));
-
-                uint256 toWithdraw = stakedBal >= _tokensToWithdraw - idleTokenBal // should be stakedBal == _tokensToWithdraw - idleTokenBal
-                    ? _tokensToWithdraw - idleTokenBal // no underflow
-                    : stakedBal;
-                // withdraw
-                if (toWithdraw != 0) {
-                    _multiRewards.withdraw(toWithdraw);
-                }
-            }
-        }
 
         uint256 before = _balance(_want);
         uint256 idleTokenBal = _balance(_idleYieldToken);
@@ -501,11 +393,6 @@ contract StrategyIdle is BaseStrategyInitializable {
         IIdleTokenV4(_idleYieldToken).redeemIdleToken(_tokensToWithdraw);
 
         wantRedeemed = _balance(_want).sub(before);
-    }
-
-    /// @notice claim liquidity mining rewards
-    function _claimRewards() internal {
-        IMultiRewards(multiRewards).getReward();
     }
 
     // ************************* View Helper methods *************************
