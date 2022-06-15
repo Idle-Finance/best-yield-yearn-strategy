@@ -154,3 +154,25 @@ def test_triggers(
 
     strategy.harvestTrigger(0)
     strategy.tendTrigger(0)
+
+
+def test_manually_harvest(
+    chain, gov, vault, strategy, token, amount, user, strategist, RELATIVE_APPROX
+):
+    # fund to the strategy
+    token.approve(vault.address, amount, {"from": user})
+    token.transfer(strategy, amount, {"from": user})
+
+    chain.sleep(1)
+    strategy.invest(amount, {"from": strategist})
+    assert pytest.approx(
+        strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX
+    ) == amount
+
+    strategy.claimRewards({"from": strategist})
+    chain.sleep(1000)
+
+    strategy.divest(strategy.totalIdleTokens(), {"from": strategist})
+    assert pytest.approx(
+        strategy.estimatedTotalAssets(), rel=RELATIVE_APPROX
+    ) == 0

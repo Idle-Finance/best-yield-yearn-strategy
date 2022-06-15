@@ -358,6 +358,10 @@ contract StrategyIdle is BaseStrategyInitializable {
         _divest(_tokensToWithdraw);
     }
 
+    function claimRewards() external onlyVaultManagers {
+        _claimRewards();
+    }
+
     // ************************* Mutative Helper methods *************************
 
     /// @notice deposit `want` to Idle
@@ -393,6 +397,11 @@ contract StrategyIdle is BaseStrategyInitializable {
         IIdleTokenV4(_idleYieldToken).redeemIdleToken(_tokensToWithdraw);
 
         wantRedeemed = _balance(_want).sub(before);
+    }
+
+    /// @notice claim rewards
+    function _claimRewards() internal {
+        IIdleTokenV4(idleYieldToken).redeemIdleToken(0);
     }
 
     // ************************* View Helper methods *************************
