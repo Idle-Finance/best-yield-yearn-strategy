@@ -127,22 +127,6 @@ def trade_factory():
 
 
 @ pytest.fixture
-def multi_rewards(MultiRewards, idleToken, gov, staking_reward):
-    multi_rewards = gov.deploy(
-        MultiRewards, gov, idleToken
-    )
-    staking_reward.mint(gov, 1e25)
-
-    staking_reward.approve(multi_rewards, 1e25, {"from": gov})
-    multi_rewards.addReward(
-        staking_reward, gov,
-        3600 * 24 * 180, {"from": gov}
-    )
-    multi_rewards.notifyRewardAmount(staking_reward, 1e25, {"from": gov})
-    yield multi_rewards
-
-
-@ pytest.fixture
 def ymechs_safe():
     yield Contract("0x2C01B4AD51a67E2d8F02208F54dF9aC4c0B778B6")
 
@@ -215,7 +199,10 @@ def weth_amout(user, weth):
 def vault(pm, gov, rewards, guardian, management, token):
     Vault = pm(config["dependencies"][0]).Vault
     vault = guardian.deploy(Vault)
-    vault.initialize(token, gov, rewards, "", "", guardian, management, {"from": gov})
+    vault.initialize(
+        token, gov, rewards, "", "",
+        guardian, management, {"from": gov}
+    )
     vault.setDepositLimit(2 ** 256 - 1, {"from": gov})
     vault.setManagement(management, {"from": gov})
     yield vault
@@ -251,15 +238,12 @@ def strategy(vault, strategyFactory, trade_factory, keeper, gov, ymechs_safe, st
     staking_rewards = [staking_reward, comp]  # rewards
     strategy.setRewardTokens(staking_rewards, {"from": gov})
 
-    # enable staking
-    strategy.enableStaking({"from": gov})
-
     yield strategy
 
 
 @ pytest.fixture()
 def strategyFactory(
-        strategist, proxyFactoryInitializable, idleToken, sushiswap, StrategyIdle, health_check, gov, multi_rewards, staking_reward, comp, idle
+        strategist, proxyFactoryInitializable, idleToken, sushiswap, StrategyIdle, health_check, gov, staking_reward, comp, idle
 ):
     def factory(vault, proxy=True):
         reward_tokens = []
@@ -268,15 +252,15 @@ def strategyFactory(
             vault,
             reward_tokens,
             idleToken,
-            multi_rewards,
             sushiswap,
             health_check,
+            False,
             {"from": strategist}
         )
 
         if proxy:
             strategyAddress = clone(
-                strategyLogic, vault, proxyFactoryInitializable, strategist, idleToken, reward_tokens, sushiswap, health_check, multi_rewards
+                strategyLogic, vault, proxyFactoryInitializable, strategist, idleToken, reward_tokens, sushiswap, health_check
             )
         else:
             strategyAddress = strategyLogic.address
